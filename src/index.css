@@ -1,0 +1,121 @@
+@import '@fontsource-variable/fraunces/full.css';
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource/caveat/500.css';
+@import '@fontsource/caveat/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background-color: #FDF5ED;
+    overscroll-behavior-y: none;
+    scrollbar-gutter: stable;
+  }
+  html.dark {
+    background-color: #0A0414;
+  }
+  body {
+    @apply font-body text-light-text dark:text-dark-text transition-colors duration-300;
+    overscroll-behavior-y: none;
+    min-height: 100dvh;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  img {
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  button, a, [role="button"] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  :focus-visible {
+    outline: 2px solid #E879B4;
+    outline-offset: 3px;
+    border-radius: inherit;
+  }
+  @supports (-webkit-touch-callout: none) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .font-hand-accent {
+    font-family: 'Caveat', cursive;
+    font-weight: 700;
+    display: inline-block;
+    transform: rotate(-3deg) translateY(-4px);
+  }
+  .font-wonky {
+    font-variation-settings: 'SOFT' 80, 'WONK' 1;
+  }
+  .motion-safe-only\:animate-none {
+    @media (prefers-reduced-motion: reduce) { animation: none !important; }
+  }
+  .bg-morph {
+    background-image: linear-gradient(
+      115deg,
+      #E879B4 0%,
+      #F4A8C7 20%,
+      #C9A0DC 45%,
+      #C77DFF 65%,
+      #E879B4 85%,
+      #F4A8C7 100%
+    );
+    background-size: 300% 300%;
+    background-position: 0% 50%;
+    animation: morph-gradient 9s ease-in-out infinite;
+  }
+  .bg-morph:hover,
+  .group:hover .bg-morph {
+    animation-duration: 3s;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bg-morph { animation: none; }
+  }
+}
+
+@keyframes morph-gradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes ken-burns {
+  from { transform: scale(1); }
+  to   { transform: scale(1.08); }
+}
+
+.ken-burns {
+  animation: ken-burns 30s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ken-burns { animation: none; }
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
