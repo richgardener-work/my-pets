@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Star, Home, LayoutGrid } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-export default function VictoryOverlay({ open, stars, moves, seconds }) {
+export default function VictoryOverlay({ open, stars, moves, seconds, guestCta }) {
   const reduce =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -59,6 +59,12 @@ export default function VictoryOverlay({ open, stars, moves, seconds }) {
               <div>⏱ {seconds}s</div>
               <div>👣 {moves} moves</div>
             </div>
+
+            {guestCta && (
+              <div className="mt-4">
+                {guestCta}
+              </div>
+            )}
 
             <div className="mt-6 flex gap-2">
               <Link

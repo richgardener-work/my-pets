@@ -1,55 +1,50 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ChevronLeft, ImageOff, PawPrint } from 'lucide-react'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase'
-import { guest } from '../utils/guestStorage'
-import { useAuth } from '../hooks/useAuth'
-import { usePets } from '../hooks/usePets'
 import PuzzleBoard from '../features/puzzle/PuzzleBoard'
 import VictoryOverlay from '../features/puzzle/VictoryOverlay'
 import GameSubHeader from '../features/puzzle/GameSubHeader'
 import {
-  shuffle, applyMove, isSolved, getStarsForDifficulty, autoSolveMoves
+  shuffle, applyMove, isSolved, getStarsForDifficulty,
 } from '../features/puzzle/puzzleLogic'
 
 const GRID_SIZE = { '3x3': 3, '4x4': 4, '5x5': 5 }
 
-export default function GameScreen({ auth, games }) {
+export default function ShareScreen() {
   const { photoId, difficulty } = useParams()
   const navigate = useNavigate()
-  const n = GRID_SIZE[difficulty] || 3
-
-  const { user, userDoc, isAuthorized } = useAuth()
-  const solveEnabled = !isAuthorized || userDoc?.admin === true
+  const n = GRID_SIZE[difficulty]
 
   const [photo, setPhoto] = useState(null)
-  const [state, setState] = useState(() => shuffle(n))
+  const [notFound, setNotFound] = useState(false)
+  const [state, setState] = useState(() => shuffle(n ?? 3))
   const stateRef = useRef(state)
   const [moves, setMoves] = useState(0)
   const [seconds, setSeconds] = useState(0)
   const [running, setRunning] = useState(true)
   const [won, setWon] = useState(false)
-  const [autoSolving, setAutoSolving] = useState(false)
   const [imgStatus, setImgStatus] = useState('loading')
 
   const puzzleContainerRef = useRef(null)
   const [puzzleArea, setPuzzleArea] = useState({ w: 0, h: 0 })
 
-  const { pets: cats } = usePets(auth.isAuthorized)
-  const { saveScore } = games
+  // Redirect if difficulty is invalid
+  useEffect(() => {
+    if (!n) navigate('/', { replace: true })
+  }, [n, navigate])
 
   useEffect(() => {
-    if (photoId.startsWith('guest-')) {
-      const guestPhoto = guest.getPhotos().find(p => p.id === photoId)
-      if (guestPhoto) setPhoto(guestPhoto)
-      return
-    }
-
+    if (!n) return
     getDoc(doc(db, 'photos', photoId)).then(snap => {
-      if (snap.exists()) setPhoto({ id: snap.id, ...snap.data() })
+      if (snap.exists()) {
+        setPhoto({ id: snap.id, ...snap.data() })
+      } else {
+        setNotFound(true)
+      }
     })
-  }, [photoId])
+  }, [photoId, n])
 
   useEffect(() => {
     if (!photo) return
@@ -57,8 +52,6 @@ export default function GameScreen({ auth, games }) {
     const url = photo.mediumUrl ?? photo.imageUrl
     if (!url) { setImgStatus('error'); return }
     const img = new Image()
-    // iOS/Safari PWA: onerror may not fire when offline via Service Worker.
-    // Fallback timeout ensures we don't hang forever.
     const timer = setTimeout(() => setImgStatus(s => s === 'loading' ? 'error' : s), 5000)
     img.onload = () => { clearTimeout(timer); setImgStatus('ok') }
     img.onerror = () => { clearTimeout(timer); setImgStatus('error') }
@@ -89,6 +82,7 @@ export default function GameScreen({ auth, games }) {
   }, [running, won])
 
   const handleMove = useCallback((tileIdx) => {
+    if (!n) return
     const next = applyMove(stateRef.current, n, tileIdx)
     stateRef.current = next
     setState(next)
@@ -99,16 +93,8 @@ export default function GameScreen({ auth, games }) {
     }
   }, [n])
 
-  useEffect(() => {
-    if (!won) return
-    saveScore(auth.user?.uid ?? 'guest', photoId, difficulty, {
-      moves,
-      timeSeconds: seconds,
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [won])
-
   const handleShuffle = () => {
+    if (!n) return
     const next = shuffle(n)
     stateRef.current = next
     setState(next)
@@ -118,32 +104,46 @@ export default function GameScreen({ auth, games }) {
     setWon(false)
   }
 
-  const handleAutoSolve = async () => {
-    if (autoSolving || !solveEnabled) return
-    setAutoSolving(true)
-    const movesToMake = autoSolveMoves(stateRef.current, n)
-    for (const move of movesToMake) {
-      await new Promise(r => setTimeout(r, n <= 3 ? 200 : n === 4 ? 100 : 60))
-      handleMove(move)
-    }
-    setAutoSolving(false)
-  }
+  const guestCta = (
+    <Link
+      to="/"
+      className="block w-full rounded-full bg-[#E879B4] px-4 py-2.5 text-white text-sm text-center font-medium hover:opacity-90 transition-opacity"
+    >
+      Upload your own pet →
+    </Link>
+  )
 
-  const catNames = photo
-    ? cats.filter(c => photo.catIds?.includes(c.id)).map(c => c.name).join(' · ')
+  const petNames = photo?.catIds?.length
+    ? photo.catIds.map(id => id.charAt(0).toUpperCase() + id.slice(1)).join(' · ')
     : ''
+
+  if (notFound) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <ImageOff size={32} className="opacity-40" />
+        <p className="text-sm opacity-60">Photo not found</p>
+        <Link
+          to="/"
+          className="flex items-center gap-1 text-sm font-medium hover:opacity-70 transition-opacity"
+        >
+          <ChevronLeft size={18} />
+          Back
+        </Link>
+      </div>
+    )
+  }
 
   if (!photo || imgStatus === 'loading') {
     return (
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center px-4 py-3 border-b border-light-pink/20 dark:border-dark-purple/20">
-          <button
-            onClick={() => navigate('/games')}
+          <Link
+            to="/"
             className="flex items-center gap-1 text-sm font-medium hover:opacity-70 transition-opacity"
           >
             <ChevronLeft size={18} />
             Back
-          </button>
+          </Link>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-light-pink dark:border-dark-purple border-t-transparent animate-spin" />
@@ -156,14 +156,14 @@ export default function GameScreen({ auth, games }) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
         <ImageOff size={32} className="opacity-40" />
-        <p className="text-sm opacity-60">Не удалось загрузить изображение</p>
-        <button
-          onClick={() => navigate('/games')}
+        <p className="text-sm opacity-60">Failed to load image</p>
+        <Link
+          to="/"
           className="flex items-center gap-1 text-sm font-medium hover:opacity-70 transition-opacity"
         >
           <ChevronLeft size={18} />
           Back
-        </button>
+        </Link>
       </div>
     )
   }
@@ -172,16 +172,16 @@ export default function GameScreen({ auth, games }) {
     <div className="flex-1 flex flex-col min-h-0">
       {/* Back / title bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-light-pink/20 dark:border-dark-purple/20">
-        <button
-          onClick={() => navigate('/games')}
+        <Link
+          to="/"
           className="flex items-center gap-1 text-sm font-medium hover:opacity-70 transition-opacity"
         >
           <ChevronLeft size={18} />
           Back
-        </button>
+        </Link>
         <div className="text-center">
-          {catNames ? (
-            <p className="font-heading font-semibold text-sm">{catNames}</p>
+          {petNames ? (
+            <p className="font-heading font-semibold text-sm">{petNames}</p>
           ) : (
             <PawPrint size={16} className="text-[#E879B4]" aria-label="Untagged" />
           )}
@@ -196,11 +196,10 @@ export default function GameScreen({ auth, games }) {
       <GameSubHeader
         seconds={seconds}
         moves={moves}
-        solveEnabled={solveEnabled}
-        autoSolving={autoSolving}
+        solveEnabled={false}
+        autoSolving={false}
         onShuffle={handleShuffle}
-        onSolve={handleAutoSolve}
-        shareUrl={`${window.location.origin}/my-pets/share/${photoId}/${difficulty}`}
+        onSolve={() => {}}
       />
 
       {/* Puzzle — fills all remaining height */}
@@ -221,6 +220,7 @@ export default function GameScreen({ auth, games }) {
         stars={getStarsForDifficulty(difficulty)}
         moves={moves}
         seconds={seconds}
+        guestCta={guestCta}
       />
     </div>
   )

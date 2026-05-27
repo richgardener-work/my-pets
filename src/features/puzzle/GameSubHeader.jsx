@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from 'react'
-import { Shuffle, Timer, Footprints, Wand2 } from 'lucide-react'
+import { Shuffle, Timer, Footprints, Wand2, Share2 } from 'lucide-react'
 import CountUp from '../../components/CountUp'
 import { useTheme } from '../../hooks/useTheme'
 
@@ -8,9 +8,29 @@ const SUBHEADER_GAP = 4
 const formatTime = (s) =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
-export default function GameSubHeader({ seconds, moves, solveEnabled, autoSolving, onShuffle, onSolve }) {
+export default function GameSubHeader({ seconds, moves, solveEnabled, autoSolving, onShuffle, onSolve, shareUrl }) {
   const { dark } = useTheme()
   const [stickyTop, setStickyTop] = useState(SUBHEADER_GAP)
+  const [toastVisible, setToastVisible] = useState(false)
+
+  const handleShare = async () => {
+    if (!shareUrl) return
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Play this pet puzzle!', url: shareUrl })
+      } catch (_) {
+        // пользователь отменил share sheet — игнорируем
+      }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setToastVisible(true)
+      setTimeout(() => setToastVisible(false), 2500)
+    } catch (_) {
+      // clipboard недоступен — молча игнорируем
+    }
+  }
 
   useLayoutEffect(() => {
     const header = document.querySelector('header')
@@ -76,9 +96,28 @@ export default function GameSubHeader({ seconds, moves, solveEnabled, autoSolvin
               <span className="hidden sm:inline">Solve</span>
             </button>
           )}
+          {shareUrl && (
+            <button
+              aria-label="Share"
+              onClick={handleShare}
+              className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            >
+              <Share2 size={13} />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+          )}
         </div>
 
       </div>
+      {toastVisible && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute left-1/2 -translate-x-1/2 bottom-[-36px] z-50 rounded-full bg-light-text/90 dark:bg-dark-text/90 text-white dark:text-dark-card px-4 py-1.5 text-xs font-medium shadow-lg pointer-events-none"
+        >
+          Link copied
+        </div>
+      )}
     </div>
   )
 }

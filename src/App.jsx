@@ -17,6 +17,7 @@ const GalleryPage = lazy(() => import('./pages/GalleryPage'))
 const GamesPage = lazy(() => import('./pages/GamesPage'))
 const GameScreen = lazy(() => import('./pages/GameScreen'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const ShareScreen = lazy(() => import('./pages/ShareScreen'))
 function AppLayout({ theme, auth, games, milestones, authOpen, onAuthOpen, onAuthClose }) {
   const location = useLocation()
   const themeStr = theme.dark ? 'dark' : 'light'
@@ -41,6 +42,7 @@ function AppLayout({ theme, auth, games, milestones, authOpen, onAuthOpen, onAut
             <Route path="/gallery" element={<GalleryPage auth={auth} />} />
             <Route path="/games" element={<GamesPage auth={auth} games={games} />} />
             <Route path="/games/:photoId/:difficulty" element={<GameScreen auth={auth} games={games} />} />
+            <Route path="/share/:photoId/:difficulty" element={<ShareScreen />} />
             <Route path="/profile" element={<ProfilePage auth={auth} games={games} />} />
           </Routes>
         </Suspense>

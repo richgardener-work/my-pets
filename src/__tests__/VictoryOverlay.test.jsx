@@ -34,4 +34,14 @@ describe('VictoryOverlay', () => {
     renderOverlay({ open: false })
     expect(screen.queryByText(/solved/i)).toBeNull()
   })
+
+  it('renders guestCta when provided', () => {
+    renderOverlay({ guestCta: <a href="/">Sign up</a> })
+    expect(screen.getByRole('link', { name: /sign up/i })).toBeInTheDocument()
+  })
+
+  it('does not render guestCta when not provided', () => {
+    renderOverlay()
+    expect(screen.queryByRole('link', { name: /sign up/i })).toBeNull()
+  })
 })
