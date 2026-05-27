@@ -33,8 +33,8 @@ export function usePhotos(_isAuthorized, filterCatId = null) {
   const guestPhotosRaw = useSyncExternalStore(guestSubscribe, () => guest.getPhotos(), () => [])
 
   useEffect(() => {
-    if (!isAuthorized) { setDbPhotos([]); setLoading(false); return }
-    const q = query(collection(db, 'photos'), where('isPublic', '==', false))
+    if (!isAuthorized || !user) { setDbPhotos([]); setLoading(false); return }
+    const q = query(collection(db, 'photos'), where('uploadedBy', '==', user.uid))
     const unsub = onSnapshot(q, (snap) => {
       let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       docs = docs.filter(p => p.imageUrl) // skip docs with incomplete/failed uploads
@@ -53,7 +53,7 @@ export function usePhotos(_isAuthorized, filterCatId = null) {
       }
     })
     return unsub
-  }, [isAuthorized, filterCatId])
+  }, [isAuthorized, user, filterCatId])
 
   const guestMerged = useMemo(() => {
     const filtered = filterCatId ? guestPhotosRaw.filter(p => p.catIds?.includes(filterCatId)) : guestPhotosRaw
@@ -80,7 +80,6 @@ export function usePhotos(_isAuthorized, filterCatId = null) {
         note,
         createdAt: serverTimestamp(),
         uploadedBy: user.uid,
-        isPublic: false,
       })
       photoDocId = photoRef.id
 

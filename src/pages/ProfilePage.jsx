@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Navigate } from 'react-router-dom'
 import { LogOut, Star, Image as ImageIcon, Puzzle, Gamepad2, Pencil } from 'lucide-react'
 import { useProfile } from '../hooks/useProfile'
 import { usePhotos } from '../hooks/usePhotos'
 import CountUp from '../components/CountUp'
-import { preloadAvatar } from '../utils/avatarCache'
 
 const MAX_NAME = 16
 
@@ -67,21 +66,6 @@ export default function ProfilePage({ auth, games }) {
   const photoIdSet = useMemo(() => new Set(allPhotos.map(p => p.id)), [allPhotos])
   const { photoCount, leaderboard, loading } = useProfile(user?.uid, photoIdSet)
   const { getScore } = games
-
-  const photoUrlsKey = [user?.photoURL, ...leaderboard.map(u => u.photoURL)]
-    .filter(Boolean).join('|')
-
-  const [avatarUrls, setAvatarUrls] = useState({})
-  useEffect(() => {
-    photoUrlsKey.split('|').filter(Boolean).forEach(url => {
-      preloadAvatar(url).then(blobUrl => {
-        if (blobUrl) setAvatarUrls(prev => {
-          if (prev[url] === blobUrl) return prev
-          return { ...prev, [url]: blobUrl }
-        })
-      })
-    })
-  }, [photoUrlsKey])
 
   if (!isAuthorized) return <Navigate to="/" replace />
 
@@ -147,10 +131,12 @@ export default function ProfilePage({ auth, games }) {
             <div className="bg-morph grid h-11 w-11 place-items-center rounded-full text-lg font-bold text-white shadow-sm">
               {initial}
             </div>
-            {avatarUrls[user?.photoURL] && (
+            {user?.photoURL && (
               <img
-                src={avatarUrls[user.photoURL]}
+                src={user.photoURL}
                 alt=""
+                referrerPolicy="no-referrer"
+                onError={(e) => e.currentTarget.classList.add('hidden')}
                 className="absolute inset-0 h-11 w-11 rounded-full object-cover shadow-sm"
               />
             )}
@@ -204,10 +190,12 @@ export default function ProfilePage({ auth, games }) {
                     }`}>
                       {uInitial}
                     </div>
-                    {avatarUrls[u.photoURL] && (
+                    {u.photoURL && (
                       <img
-                        src={avatarUrls[u.photoURL]}
+                        src={u.photoURL}
                         alt=""
+                        referrerPolicy="no-referrer"
+                        onError={(e) => e.currentTarget.classList.add('hidden')}
                         className="absolute inset-0 h-8 w-8 rounded-full object-cover"
                       />
                     )}

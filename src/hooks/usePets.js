@@ -17,14 +17,14 @@ export function usePets() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!isAuthorized) { setDbPets([]); setLoading(false); return }
-    const q = query(collection(db, 'cats'), where('isPublic', '==', false))
+    if (!isAuthorized || !user) { setDbPets([]); setLoading(false); return }
+    const q = collection(db, 'users', user.uid, 'pets')
     const unsub = onSnapshot(q, (snap) => {
       setDbPets(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     })
     return unsub
-  }, [isAuthorized])
+  }, [isAuthorized, user])
 
   const guestMerged = useMemo(() => guestPetsRaw, [guestPetsRaw])
 
@@ -40,17 +40,14 @@ export function usePets() {
     }
     if (!user) throw new Error('Must be signed in')
     const slug = await findAvailableSlug(trimmed, async (s) => {
-      const snap = await getDoc(doc(db, 'cats', s))
+      const snap = await getDoc(doc(db, 'users', user.uid, 'pets', s))
       return snap.exists()
     })
-    await setDoc(doc(db, 'cats', slug), {
+    await setDoc(doc(db, 'users', user.uid, 'pets', slug), {
       name: trimmed,
       slug,
       avatarPhotoId: '',
       createdAt: serverTimestamp(),
-      createdBy: user.uid,
-      createdByEmail: user.email,
-      isPublic: false,
     })
     return slug
   }, [isAuthorized, user, dbPets, guestMerged])
@@ -59,10 +56,12 @@ export function usePets() {
     if (!isAuthorized) {
       return guest.removeCat(id)
     }
-    // Auth: каскадный detach — вычистить slug из catIds всех фоток, потом удалить питомца
+    if (!user) throw new Error('Must be signed in')
+    // Каскадный detach — вычистить slug из catIds только фоток текущего пользователя
     const photosSnap = await getDocs(query(
       collection(db, 'photos'),
-      where('catIds', 'array-contains', id)
+      where('catIds', 'array-contains', id),
+      where('uploadedBy', '==', user.uid)
     ))
     if (photosSnap.size > 0) {
       const batch = writeBatch(db)
@@ -71,8 +70,8 @@ export function usePets() {
       }
       await batch.commit()
     }
-    await deleteDoc(doc(db, 'cats', id))
-  }, [isAuthorized, guestPetsRaw])
+    await deleteDoc(doc(db, 'users', user.uid, 'pets', id))
+  }, [isAuthorized, user, guestPetsRaw])
 
   return {
     pets: isAuthorized ? dbPets : guestMerged,

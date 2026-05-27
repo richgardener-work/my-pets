@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
-import { doc, getDoc, setDoc, deleteDoc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '../firebase'
 
 let _state = {
@@ -93,28 +93,18 @@ function _init() {
     })
 
     if (!snap || !snap.exists()) {
-      // First login — try to claim invite
-      const inviteRef = doc(db, 'invites', firebaseUser.email)
-      const inviteSnap = await getDoc(inviteRef).catch(() => null)
-      const invite = inviteSnap?.exists() ? inviteSnap.data() : null
-
       await setDoc(userRef, {
         email:         firebaseUser.email,
         displayName:   firebaseUser.displayName ?? null,
         photoURL:      firebaseUser.photoURL ?? null,
-        allowed:       invite !== null,
-        admin:         invite?.admin === true,
+        allowed:       true,
+        admin:         false,
         totalStars:    0,
         totalGames:    0,
         puzzlesSolved: 0,
       }).catch((err) => {
         if (err?.code !== 'permission-denied') console.error('userDoc setDoc:', err)
       })
-
-      if (invite) {
-        // Best-effort cleanup; failure is fine.
-        deleteDoc(inviteRef).catch(() => {})
-      }
     }
 
     // Live-subscribe to userDoc for reactive admin/totalStars updates

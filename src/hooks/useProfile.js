@@ -18,11 +18,18 @@ export function useProfile(uid, photoIds = null) {
 
   useEffect(() => {
     if (!uid) return
-    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
-      const docs = snap.docs.map(d => ({ uid: d.id, ...d.data() }))
-      setUsers(buildLeaderboard(docs))
-      setUsersLoading(false)
-    })
+    const unsub = onSnapshot(
+      collection(db, 'users'),
+      (snap) => {
+        const docs = snap.docs.map(d => ({ uid: d.id, ...d.data() }))
+        setUsers(buildLeaderboard(docs))
+        setUsersLoading(false)
+      },
+      (err) => {
+        if (err.code !== 'permission-denied') console.warn('leaderboard snapshot:', err)
+        setUsersLoading(false)
+      },
+    )
     return unsub
   }, [uid])
 
