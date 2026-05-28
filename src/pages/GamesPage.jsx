@@ -9,6 +9,7 @@ import { usePets } from '../hooks/usePets'
 import { usePhotos } from '../hooks/usePhotos'
 import { filterPhotosByTag } from '../utils/photoFilter'
 import { pickRandomPuzzle } from '../utils/pickRandomPuzzle'
+import { createSession } from '../utils/sessionTokens'
 
 const DIFFS = [
   { label: '3×3', value: '3x3', n: 3 },
@@ -38,10 +39,20 @@ export default function GamesPage({ auth, games }) {
   )
   const totalPossible = photos.length * DIFFS.length
 
-  const onPlayRandom = () => {
+  const onPlayRandom = async () => {
     const diff = DIFFS[Math.floor(Math.random() * DIFFS.length)]
     const chosen = pickRandomPuzzle({ photos, getScore, uid, difficulty: diff.value })
-    if (chosen) navigate(`/games/${chosen.id}/${diff.value}`)
+    if (!chosen) return
+    try {
+      const sessionId = await createSession({
+        uid: auth.user?.uid ?? 'guest',
+        type: 'game',
+        payload: { photoId: chosen.id, difficulty: diff.value },
+      })
+      navigate(`/games/${sessionId}`)
+    } catch {
+      console.error('Failed to create session for random play')
+    }
   }
 
   const setActive = (id) => {
@@ -121,7 +132,18 @@ export default function GamesPage({ auth, games }) {
                         cats={pets}
                         getScore={getScore}
                         uid={uid}
-                        onLaunch={(diff) => navigate(`/games/${p.id}/${diff}`)}
+                        onLaunch={async (diff) => {
+                          try {
+                            const sessionId = await createSession({
+                              uid: auth.user?.uid ?? 'guest',
+                              type: 'game',
+                              payload: { photoId: p.id, difficulty: diff },
+                            })
+                            navigate(`/games/${sessionId}`)
+                          } catch {
+                            console.error('Failed to create session')
+                          }
+                        }}
                       />
                     </div>
                   </div>
@@ -137,6 +159,9 @@ export default function GamesPage({ auth, games }) {
 
 function GameRow({ photo, cats, getScore, uid, onLaunch }) {
   const [open, setOpen] = useState(false)
+  const [launching, setLaunching] = useState(false)
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
   const rootRef = useRef(null)
   const catName = cats.filter(c => photo.catIds?.includes(c.id)).map(c => c.name).join(' · ')
 
@@ -184,11 +209,20 @@ function GameRow({ photo, cats, getScore, uid, onLaunch }) {
       </div>
 
       <div ref={rootRef} className="shrink-0">
-        <PlayDifficultyButton
-          open={open}
-          onOpen={() => setOpen(true)}
-          onSelect={(diff) => { setOpen(false); onLaunch(diff) }}
-        />
+        {launching ? (
+          <div className="w-8 h-8 rounded-full border-2 border-light-pink dark:border-dark-purple border-t-transparent animate-spin" />
+        ) : (
+          <PlayDifficultyButton
+            open={open}
+            onOpen={() => setOpen(true)}
+            onSelect={async (diff) => {
+              setOpen(false)
+              setLaunching(true)
+              await onLaunch(diff)
+              if (mountedRef.current) setLaunching(false)
+            }}
+          />
+        )}
       </div>
     </motion.div>
   )

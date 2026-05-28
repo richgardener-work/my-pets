@@ -45,3 +45,32 @@ describe('VictoryOverlay', () => {
     expect(screen.queryByRole('link', { name: /sign up/i })).toBeNull()
   })
 })
+
+describe('VictoryOverlay — senderMessage', () => {
+  it('renders senderMessage in quotes when provided', () => {
+    renderOverlay({ senderMessage: 'Solve this puzzle!' })
+    expect(screen.getByText(/Solve this puzzle!/)).toBeInTheDocument()
+  })
+
+  it('does not render "Solved!" heading when senderMessage is provided', () => {
+    renderOverlay({ senderMessage: 'Hi there' })
+    expect(screen.queryByText(/solved/i)).toBeNull()
+  })
+
+  it('renders standard "Solved!" heading when senderMessage is null', () => {
+    renderOverlay({ senderMessage: null })
+    expect(screen.getByText(/solved/i)).toBeInTheDocument()
+  })
+
+  it('renders standard "Solved!" heading when senderMessage is not provided', () => {
+    renderOverlay()
+    expect(screen.getByText(/solved/i)).toBeInTheDocument()
+  })
+
+  it('renders "Upload your own pet" CTA link when senderMessage is provided', () => {
+    renderOverlay({ senderMessage: 'Good job!' })
+    expect(
+      screen.getByRole('link', { name: /upload your own pet/i })
+    ).toBeInTheDocument()
+  })
+})

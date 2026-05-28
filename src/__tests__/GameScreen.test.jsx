@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { getDoc } from 'firebase/firestore'
+import { readSession, deleteSession } from '../utils/sessionTokens'
+import { useAuth } from '../hooks/useAuth'
 import GameScreen from '../pages/GameScreen'
 
 // ── deps ───────────────────────────────────────────────────────────────────
@@ -14,10 +16,14 @@ vi.mock('../utils/guestStorage', () => ({
   guest: { getPhotos: vi.fn(() => []) },
 }))
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ user: null, userDoc: null, isAuthorized: false }),
+  useAuth: vi.fn(() => ({ user: { uid: 'user-1' }, userDoc: null, isAuthorized: true })),
 }))
 vi.mock('../hooks/usePets', () => ({
   usePets: () => ({ pets: [] }),
+}))
+vi.mock('../utils/sessionTokens', () => ({
+  readSession: vi.fn(),
+  deleteSession: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('../features/puzzle/PuzzleBoard', () => ({
   default: () => <div data-testid="puzzle-board" />,
@@ -26,6 +32,9 @@ vi.mock('../features/puzzle/VictoryOverlay', () => ({
   default: () => null,
 }))
 vi.mock('../features/puzzle/GameSubHeader', () => ({
+  default: () => null,
+}))
+vi.mock('../components/SharePuzzleModal', () => ({
   default: () => null,
 }))
 vi.mock('../features/puzzle/puzzleLogic', () => ({
@@ -55,18 +64,19 @@ const mockPhotoSnap = {
   }),
 }
 
-const mockAuth = { user: null, userDoc: null, isAuthorized: false }
+const mockAuth = { user: { uid: 'user-1' }, userDoc: null, isAuthorized: true }
 const mockGames = { saveScore: vi.fn(), getScore: vi.fn(() => null) }
 
 function renderGame() {
   return render(
-    <MemoryRouter initialEntries={['/games/photo-123/3x3']}>
+    <MemoryRouter initialEntries={['/games/session-abc']}>
       <Routes>
         <Route
-          path="/games/:photoId/:difficulty"
+          path="/games/:sessionId"
           element={<GameScreen auth={mockAuth} games={mockGames} />}
         />
         <Route path="/games" element={<div data-testid="games-page" />} />
+        <Route path="/" element={<div data-testid="home-page" />} />
       </Routes>
     </MemoryRouter>
   )
@@ -76,42 +86,44 @@ beforeEach(() => {
   imgInstances = []
   vi.stubGlobal('Image', MockImage)
   vi.clearAllMocks()
+  useAuth.mockReturnValue({ user: { uid: 'user-1' }, userDoc: null, isAuthorized: true })
 })
 
 // ── tests ──────────────────────────────────────────────────────────────────
 describe('GameScreen — image guard', () => {
-  it('shows spinner while photo and image are loading', () => {
-    getDoc.mockReturnValue(new Promise(() => {})) // never resolves
+  it('shows spinner while session and photo are loading', () => {
+    readSession.mockReturnValue(new Promise(() => {}))
     renderGame()
     expect(document.querySelector('.animate-spin')).toBeTruthy()
     expect(screen.queryByTestId('puzzle-board')).toBeNull()
   })
 
-  it('shows puzzle board when image loads successfully', async () => {
+  it('shows puzzle board when session resolves and image loads successfully', async () => {
+    readSession.mockResolvedValue({ type: 'game', payload: { photoId: 'photo-123', difficulty: '3x3' } })
     getDoc.mockResolvedValue(mockPhotoSnap)
     renderGame()
 
     await waitFor(() => expect(imgInstances.length).toBeGreaterThan(0))
-
     await act(async () => { imgInstances[0].onload?.() })
 
     expect(screen.getByTestId('puzzle-board')).toBeInTheDocument()
-    expect(screen.queryByText('Не удалось загрузить изображение')).toBeNull()
+    expect(screen.queryByText('Could not load image')).toBeNull()
   })
 
   it('shows error screen when image fails to load', async () => {
+    readSession.mockResolvedValue({ type: 'game', payload: { photoId: 'photo-123', difficulty: '3x3' } })
     getDoc.mockResolvedValue(mockPhotoSnap)
     renderGame()
 
     await waitFor(() => expect(imgInstances.length).toBeGreaterThan(0))
-
     await act(async () => { imgInstances[0].onerror?.() })
 
-    expect(screen.getByText('Не удалось загрузить изображение')).toBeInTheDocument()
+    expect(screen.getByText('Could not load image')).toBeInTheDocument()
     expect(screen.queryByTestId('puzzle-board')).toBeNull()
   })
 
   it('Back button on error screen navigates to /games', async () => {
+    readSession.mockResolvedValue({ type: 'game', payload: { photoId: 'photo-123', difficulty: '3x3' } })
     getDoc.mockResolvedValue(mockPhotoSnap)
     renderGame()
 
@@ -120,6 +132,46 @@ describe('GameScreen — image guard', () => {
 
     const backBtn = screen.getByRole('button', { name: /back/i })
     backBtn.click()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('games-page')).toBeInTheDocument()
+    })
+  })
+})
+
+describe('GameScreen — auth guard', () => {
+  it('redirects to / when user is not authorized', async () => {
+    useAuth.mockReturnValue({ user: null, userDoc: null, isAuthorized: false })
+    renderGame()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('home-page')).toBeInTheDocument()
+    })
+  })
+})
+
+describe('GameScreen — session guard', () => {
+  it('redirects to /games when session uid does not match', async () => {
+    readSession.mockRejectedValue(new Error('forbidden'))
+    renderGame()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('games-page')).toBeInTheDocument()
+    })
+  })
+
+  it('redirects to /games when session is not found', async () => {
+    readSession.mockRejectedValue(new Error('not found'))
+    renderGame()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('games-page')).toBeInTheDocument()
+    })
+  })
+
+  it('redirects to /games when session is expired', async () => {
+    readSession.mockRejectedValue(new Error('expired'))
+    renderGame()
 
     await waitFor(() => {
       expect(screen.getByTestId('games-page')).toBeInTheDocument()

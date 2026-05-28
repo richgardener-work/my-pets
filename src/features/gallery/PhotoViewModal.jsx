@@ -7,10 +7,13 @@ import { usePets } from '../../hooks/usePets'
 import { usePhotos } from '../../hooks/usePhotos'
 import { useTheme } from '../../hooks/useTheme'
 import { useModalScrollLock } from '../../hooks/useModalScrollLock'
+import { useAuth } from '../../hooks/useAuth'
+import { createSession } from '../../utils/sessionTokens'
 import PhotoForm from './PhotoForm'
 
 export default function PhotoViewModal({ open, photo, onClose }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { dark } = useTheme()
   const { pets: cats } = usePets()
   const [diffOpen, setDiffOpen] = useState(false)
@@ -130,9 +133,18 @@ export default function PhotoViewModal({ open, photo, onClose }) {
     URL.revokeObjectURL(url)
   }
 
-  const handlePlay = (difficulty) => {
+  const handlePlay = async (difficulty) => {
     close()
-    navigate(`/games/${photo.id}/${difficulty}`)
+    try {
+      const sessionId = await createSession({
+        uid: user?.uid ?? 'guest',
+        type: 'game',
+        payload: { photoId: photo.id, difficulty },
+      })
+      navigate(`/games/${sessionId}`)
+    } catch {
+      console.error('Failed to create session from gallery')
+    }
   }
 
   return (

@@ -63,34 +63,21 @@ describe('GameSubHeader — buttons', () => {
 })
 
 describe('GameSubHeader — share button', () => {
-  it('does not render Share button when shareUrl is not provided', () => {
+  it('does not render Share button when onShareOpen is not provided', () => {
     render(<GameSubHeader {...defaultProps} />)
     expect(screen.queryByRole('button', { name: /share/i })).not.toBeInTheDocument()
   })
 
-  it('renders Share button when shareUrl is provided', () => {
-    render(<GameSubHeader {...defaultProps} shareUrl="https://example.com/my-pets/share/abc/3x3" />)
+  it('renders Share button when onShareOpen is provided', () => {
+    render(<GameSubHeader {...defaultProps} onShareOpen={vi.fn()} />)
     expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument()
   })
 
-  it('calls navigator.share when Share is clicked and navigator.share is available', async () => {
+  it('calls onShareOpen when Share button is clicked', async () => {
     const user = userEvent.setup()
-    const mockShare = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { ...navigator, share: mockShare, clipboard: undefined })
-    render(<GameSubHeader {...defaultProps} shareUrl="https://example.com/my-pets/share/abc/3x3" />)
+    const onShareOpen = vi.fn()
+    render(<GameSubHeader {...defaultProps} onShareOpen={onShareOpen} />)
     await user.click(screen.getByRole('button', { name: /share/i }))
-    expect(mockShare).toHaveBeenCalledWith({
-      title: 'Play this pet puzzle!',
-      url: 'https://example.com/my-pets/share/abc/3x3',
-    })
-  })
-
-  it('copies to clipboard when navigator.share is not available', async () => {
-    const user = userEvent.setup()
-    const mockWriteText = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { ...navigator, share: undefined, clipboard: { writeText: mockWriteText } })
-    render(<GameSubHeader {...defaultProps} shareUrl="https://example.com/my-pets/share/abc/3x3" />)
-    await user.click(screen.getByRole('button', { name: /share/i }))
-    expect(mockWriteText).toHaveBeenCalledWith('https://example.com/my-pets/share/abc/3x3')
+    expect(onShareOpen).toHaveBeenCalledTimes(1)
   })
 })
